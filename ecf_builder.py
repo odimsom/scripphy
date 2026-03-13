@@ -31,8 +31,11 @@ MAX_IA_TOT_OM   = 20    # ImpuestosAdicionales OtraMoneda
 MAX_COD_ITEM    = 5     # CodigosItem por item
 MAX_SUBCANT     = 5     # SubcantidadesItem por item
 MAX_SUBDESC     = 12    # SubDescuentos por item
-MAX_SUBREC      = 12    # SubRecargaros por item
+MAX_SUBREC      = 12    # SubRecargos por item
 MAX_IMPTABLA    = 2     # ImpuestosAdicionales en TablaImpuesto por item
+MAX_SUBTOTALES  = 20    # Subtotales
+MAX_DR          = 20    # DescuentosORecargos
+MAX_PAGINAS     = 100   # Paginacion
 
 
 # ---------------------------------------------------------------------------
@@ -180,31 +183,6 @@ def _build_comprador_full(parent: ET.Element, row: dict,
 
 def _build_informaciones_adicionales_std(parent: ET.Element, row: dict):
     """InformacionesAdicionales estándar (tipos 31,32,33,34,44,45)."""
-    campos = [
-        ('IA_FechaEmbarque',    'FechaEmbarque'),
-        ('IA_NumeroEmbarque',   'NumeroEmbarque'),
-        ('IA_NumeroContenedor', 'NumeroContenedor'),
-        ('IA_NumeroReferencia', 'NumeroReferencia'),
-        ('IA_PesoBruto',        'PesoBruto'),
-        ('IA_PesoNeto',         'PesoNeto'),
-        ('IA_UnidadPesoBruto',  'UnidadPesoBruto'),
-        ('IA_UnidadPesoNeto',   'UnidadPesoNeto'),
-        ('IA_CantidadBulto',    'CantidadBulto'),
-        ('IA_UnidadBulto',      'UnidadBulto'),
-        ('IA_VolumenBulto',     'VolumenBulto'),
-        ('IA_UnidadVolumen',    'UnidadVolumen'),
-    ]
-    vals = {xml_tag: v(row, col) for col, xml_tag in campos}
-    any_val = any(x is not None for x in vals.values())
-    if any_val:
-        ia = ET.SubElement(parent, 'InformacionesAdicionales')
-        for col, xml_tag in campos:
-            add(ia, xml_tag, v(row, col))
-    return None
-
-
-def _build_informaciones_adicionales_std_2(parent: ET.Element, row: dict):
-    """InformacionesAdicionales con columna correcture — usa tag correcto."""
     cols = [
         ('IA_FechaEmbarque',    'FechaEmbarque'),
         ('IA_NumeroEmbarque',   'NumeroEmbarque'),
@@ -494,6 +472,109 @@ def _build_item_mineria(item_el: ET.Element, row: dict, n: int):
         add(mi, 'PesoNetoMineria',   pnm)
         add(mi, 'TipoAfiliacion',    ta)
         add(mi, 'Liquidacion',       li)
+
+
+
+def _build_subtotales(parent: ET.Element, row: dict,
+                      has_imp_adicional: bool = True):
+    """Subtotales opcionales (máx 20). Columnas: Sub_N_Campo."""
+    items = []
+    for i in range(1, MAX_SUBTOTALES + 1):
+        num = v(row, f'Sub_{i}_NumeroSubTotal')
+        desc = v(row, f'Sub_{i}_DescripcionSubtotal')
+        if num is None and desc is None:
+            break
+        items.append(i)
+    if not items:
+        return
+    subtotales = ET.SubElement(parent, 'Subtotales')
+    for i in items:
+        sub = ET.SubElement(subtotales, 'Subtotal')
+        add(sub, 'NumeroSubTotal',              v(row, f'Sub_{i}_NumeroSubTotal'))
+        add(sub, 'DescripcionSubtotal',         v(row, f'Sub_{i}_DescripcionSubtotal'))
+        add(sub, 'Orden',                       v(row, f'Sub_{i}_Orden'))
+        add(sub, 'SubTotalMontoGravadoTotal',   v(row, f'Sub_{i}_SubTotalMontoGravadoTotal'))
+        add(sub, 'SubTotalMontoGravadoI1',      v(row, f'Sub_{i}_SubTotalMontoGravadoI1'))
+        add(sub, 'SubTotalMontoGravadoI2',      v(row, f'Sub_{i}_SubTotalMontoGravadoI2'))
+        add(sub, 'SubTotalMontoGravadoI3',      v(row, f'Sub_{i}_SubTotalMontoGravadoI3'))
+        add(sub, 'SubTotaITBIS',                v(row, f'Sub_{i}_SubTotaITBIS'))
+        add(sub, 'SubTotaITBIS1',               v(row, f'Sub_{i}_SubTotaITBIS1'))
+        add(sub, 'SubTotaITBIS2',               v(row, f'Sub_{i}_SubTotaITBIS2'))
+        add(sub, 'SubTotaITBIS3',               v(row, f'Sub_{i}_SubTotaITBIS3'))
+        if has_imp_adicional:
+            add(sub, 'SubTotalImpuestoAdicional', v(row, f'Sub_{i}_SubTotalImpuestoAdicional'))
+        add(sub, 'SubTotalExento',              v(row, f'Sub_{i}_SubTotalExento'))
+        add(sub, 'MontoSubTotal',               v(row, f'Sub_{i}_MontoSubTotal'))
+        add(sub, 'Lineas',                      v(row, f'Sub_{i}_Lineas'))
+
+
+def _build_descuentos_o_recargos(parent: ET.Element, row: dict,
+                                  has_norma1007: bool = True):
+    """DescuentosORecargos opcionales (máx 20). Columnas: DR_N_Campo."""
+    items = []
+    for i in range(1, MAX_DR + 1):
+        nl = v(row, f'DR_{i}_NumeroLinea')
+        if nl is None:
+            break
+        items.append(i)
+    if not items:
+        return
+    dor = ET.SubElement(parent, 'DescuentosORecargos')
+    for i in items:
+        dr = ET.SubElement(dor, 'DescuentoORecargo')
+        add(dr, 'NumeroLinea',                      v(row, f'DR_{i}_NumeroLinea'))
+        add(dr, 'TipoAjuste',                      v(row, f'DR_{i}_TipoAjuste'))
+        if has_norma1007:
+            add(dr, 'IndicadorNorma1007',           v(row, f'DR_{i}_IndicadorNorma1007'))
+        add(dr, 'DescripcionDescuentooRecargo',     v(row, f'DR_{i}_DescripcionDescuentooRecargo'))
+        add(dr, 'TipoValor',                       v(row, f'DR_{i}_TipoValor'))
+        add(dr, 'ValorDescuentooRecargo',           v(row, f'DR_{i}_ValorDescuentooRecargo'))
+        add(dr, 'MontoDescuentooRecargo',           v(row, f'DR_{i}_MontoDescuentooRecargo'))
+        add(dr, 'MontoDescuentooRecargoOtraMoneda', v(row, f'DR_{i}_MontoDescuentooRecargoOtraMoneda'))
+        add(dr, 'IndicadorFacturacionDescuentooRecargo',
+            v(row, f'DR_{i}_IndicadorFacturacionDescuentooRecargo'))
+
+
+def _build_paginacion(parent: ET.Element, row: dict,
+                      has_imp_adicional: bool = True,
+                      has_no_facturable: bool = True):
+    """Paginacion opcional (máx 100). Columnas: Pag_N_Campo."""
+    items = []
+    for i in range(1, MAX_PAGINAS + 1):
+        pn = v(row, f'Pag_{i}_PaginaNo')
+        if pn is None:
+            break
+        items.append(i)
+    if not items:
+        return
+    pag = ET.SubElement(parent, 'Paginacion')
+    for i in items:
+        pg = ET.SubElement(pag, 'Pagina')
+        add(pg, 'PaginaNo',                          v(row, f'Pag_{i}_PaginaNo'))
+        add(pg, 'NoLineaDesde',                      v(row, f'Pag_{i}_NoLineaDesde'))
+        add(pg, 'NoLineaHasta',                      v(row, f'Pag_{i}_NoLineaHasta'))
+        add(pg, 'SubtotalMontoGravadoPagina',        v(row, f'Pag_{i}_SubtotalMontoGravadoPagina'))
+        add(pg, 'SubtotalMontoGravado1Pagina',       v(row, f'Pag_{i}_SubtotalMontoGravado1Pagina'))
+        add(pg, 'SubtotalMontoGravado2Pagina',       v(row, f'Pag_{i}_SubtotalMontoGravado2Pagina'))
+        add(pg, 'SubtotalMontoGravado3Pagina',       v(row, f'Pag_{i}_SubtotalMontoGravado3Pagina'))
+        add(pg, 'SubtotalExentoPagina',              v(row, f'Pag_{i}_SubtotalExentoPagina'))
+        add(pg, 'SubtotalItbisPagina',               v(row, f'Pag_{i}_SubtotalItbisPagina'))
+        add(pg, 'SubtotalItbis1Pagina',              v(row, f'Pag_{i}_SubtotalItbis1Pagina'))
+        add(pg, 'SubtotalItbis2Pagina',              v(row, f'Pag_{i}_SubtotalItbis2Pagina'))
+        add(pg, 'SubtotalItbis3Pagina',              v(row, f'Pag_{i}_SubtotalItbis3Pagina'))
+        if has_imp_adicional:
+            add(pg, 'SubtotalImpuestoAdicionalPagina',
+                v(row, f'Pag_{i}_SubtotalImpuestoAdicionalPagina'))
+            sia_esp = v(row, f'Pag_{i}_SubtotalImpuestoSelectivoConsumoEspecificoPagina')
+            sia_otr = v(row, f'Pag_{i}_SubtotalOtrosImpuesto')
+            if sia_esp is not None or sia_otr is not None:
+                sia = ET.SubElement(pg, 'SubtotalImpuestoAdicional')
+                add(sia, 'SubtotalImpuestoSelectivoConsumoEspecificoPagina', sia_esp)
+                add(sia, 'SubtotalOtrosImpuesto', sia_otr)
+        add(pg, 'MontoSubtotalPagina',               v(row, f'Pag_{i}_MontoSubtotalPagina'))
+        if has_no_facturable:
+            add(pg, 'SubtotalMontoNoFacturablePagina',
+                v(row, f'Pag_{i}_SubtotalMontoNoFacturablePagina'))
 
 
 def _build_informacion_referencia(parent: ET.Element, row: dict,
@@ -801,14 +882,17 @@ def build_ecf_31(row: dict) -> str:
     add(id_doc, 'TotalPaginas',              v(row, 'TotalPaginas'))
 
     _build_emisor(enc, row)
-    _build_comprador_full(enc, row)
-    _build_informaciones_adicionales_std_2(enc, row)
+    _build_comprador_full(enc, row, has_id_extranjero=False)
+    _build_informaciones_adicionales_std(enc, row)
     _build_transporte_std(enc, row)
-    _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=False)
+    _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=True)
     _build_otra_moneda_full(enc, row)
 
     detalles = ET.SubElement(root, 'DetallesItems')
-    _build_items_full(detalles, row)
+    _build_items_full(detalles, row, has_retencion=True, has_mineria=False)
+    _build_subtotales(root, row)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -840,13 +924,16 @@ def build_ecf_32(row: dict) -> str:
 
     _build_emisor(enc, row)
     _build_comprador_full(enc, row)
-    _build_informaciones_adicionales_std_2(enc, row)
+    _build_informaciones_adicionales_std(enc, row)
     _build_transporte_std(enc, row)
     _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=False)
     _build_otra_moneda_full(enc, row)
 
     detalles = ET.SubElement(root, 'DetallesItems')
     _build_items_full(detalles, row)
+    _build_subtotales(root, row)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -878,14 +965,17 @@ def build_ecf_33(row: dict) -> str:
 
     _build_emisor(enc, row)
     _build_comprador_full(enc, row)
-    _build_informaciones_adicionales_std_2(enc, row)
+    _build_informaciones_adicionales_std(enc, row)
     _build_transporte_std(enc, row)
     _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=True)
     _build_otra_moneda_full(enc, row)
 
     detalles = ET.SubElement(root, 'DetallesItems')
     _build_items_full(detalles, row, has_retencion=True, retencion_required=False)
-    _build_informacion_referencia(root, row)
+    _build_subtotales(root, row)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row)
+    _build_informacion_referencia(root, row, required=True, has_razon=True)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
     return _pretty(root)
@@ -912,13 +1002,16 @@ def build_ecf_34(row: dict) -> str:
 
     _build_emisor(enc, row)
     _build_comprador_full(enc, row)
-    _build_informaciones_adicionales_std_2(enc, row)
+    _build_informaciones_adicionales_std(enc, row)
     _build_transporte_std(enc, row)
     _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=True)
     _build_otra_moneda_full(enc, row)
 
     detalles = ET.SubElement(root, 'DetallesItems')
     _build_items_full(detalles, row, has_retencion=True, retencion_required=False)
+    _build_subtotales(root, row)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row)
 
     # InformacionReferencia REQUERIDA en tipo 34
     _build_informacion_referencia(root, row, required=True, has_razon=True)
@@ -947,7 +1040,7 @@ def build_ecf_41(row: dict) -> str:
     add(id_doc, 'BancoPago',                 v(row, 'BancoPago'))
     add(id_doc, 'TotalPaginas',              v(row, 'TotalPaginas'))
 
-    _build_emisor(enc, row)
+    _build_emisor(enc, row, has_codigo_vendedor=False, has_zona_ruta=False)
 
     # Comprador REQUIRED en tipo 41, solo RNCComprador y RazonSocial req
     comp = ET.SubElement(enc, 'Comprador')
@@ -988,6 +1081,9 @@ def build_ecf_41(row: dict) -> str:
 
     detalles = ET.SubElement(root, 'DetallesItems')
     _build_items_41(detalles, row)
+    _build_subtotales(root, row)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row, has_imp_adicional=False, has_no_facturable=False)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -1006,7 +1102,7 @@ def build_ecf_43(row: dict) -> str:
     add(id_doc, 'TipoPago',                  v(row, 'TipoPago'))
     add(id_doc, 'TotalPaginas',              v(row, 'TotalPaginas'))
 
-    _build_emisor(enc, row)
+    _build_emisor(enc, row, has_codigo_vendedor=False, has_zona_ruta=False)
     _build_totales_43(enc, row)
 
     # OtraMoneda mínima tipo 43
@@ -1021,6 +1117,8 @@ def build_ecf_43(row: dict) -> str:
 
     detalles = ET.SubElement(root, 'DetallesItems')
     _build_items_43(detalles, row)
+    _build_subtotales(root, row, has_imp_adicional=False)
+    _build_paginacion(root, row, has_imp_adicional=False, has_no_facturable=False)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -1071,7 +1169,7 @@ def build_ecf_44(row: dict) -> str:
     add(comp, 'ResponsablePago',       v(row, 'ResponsablePago'))
     add(comp, 'InformacionAdicionalComprador', v(row, 'InformacionAdicionalComprador'))
 
-    _build_informaciones_adicionales_std_2(enc, row)
+    _build_informaciones_adicionales_std(enc, row)
     _build_transporte_std(enc, row)
     _build_totales_44(enc, row)
 
@@ -1106,6 +1204,9 @@ def build_ecf_44(row: dict) -> str:
                       has_subcantidad=False, has_grados_alcohol=False,
                       has_mineria=False, has_cant_ref=False,
                       has_imp_tabla=True)
+    _build_subtotales(root, row)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -1156,13 +1257,16 @@ def build_ecf_45(row: dict) -> str:
     add(comp, 'ResponsablePago',       v(row, 'ResponsablePago'))
     add(comp, 'InformacionAdicionalComprador', v(row, 'InformacionAdicionalComprador'))
 
-    _build_informaciones_adicionales_std_2(enc, row)
+    _build_informaciones_adicionales_std(enc, row)
     _build_transporte_std(enc, row)
-    _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=True)
+    _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=False)
     _build_otra_moneda_full(enc, row)
 
     detalles = ET.SubElement(root, 'DetallesItems')
-    _build_items_full(detalles, row)
+    _build_items_full(detalles, row, has_mineria=False)
+    _build_subtotales(root, row)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -1238,6 +1342,9 @@ def build_ecf_46(row: dict) -> str:
                       has_subcantidad=True, has_grados_alcohol=True,
                       has_imp_tabla=False, has_mineria=True,
                       has_cant_ref=True)
+    _build_subtotales(root, row, has_imp_adicional=False)
+    _build_descuentos_o_recargos(root, row)
+    _build_paginacion(root, row, has_imp_adicional=False)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -1295,6 +1402,8 @@ def build_ecf_47(row: dict) -> str:
 
     detalles = ET.SubElement(root, 'DetallesItems')
     _build_items_47(detalles, row)
+    _build_subtotales(root, row, has_imp_adicional=False)
+    _build_paginacion(root, row, has_imp_adicional=False, has_no_facturable=False)
     _build_informacion_referencia(root, row)
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
@@ -1325,7 +1434,6 @@ def build_ecf(row: dict) -> tuple[str, str]:
     Retorna (xml_string, nombre_archivo) o lanza ValueError.
     """
     tipo_raw = row.get('TipoeCF')
-    # Auto-derivar TipoeCF desde eNCF si no está explícito (Exx... → tipo xx)
     if _is_empty(tipo_raw):
         encf_raw = str(row.get('eNCF') or '').strip()
         if len(encf_raw) >= 3 and encf_raw[0].upper() == 'E' and encf_raw[1:3].isdigit():
@@ -1344,7 +1452,6 @@ def build_ecf(row: dict) -> tuple[str, str]:
         )
 
     encf = _clean(row.get('eNCF')) or f'ECF_{tipo}'
-    # Sanitizar nombre de archivo
     filename = ''.join(c for c in encf if c.isalnum() or c in '-_') + '.xml'
 
     xml_str = BUILDERS[tipo](row)

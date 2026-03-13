@@ -4,6 +4,7 @@ Aplicación Flask para convertir XLSX de e-CF a XML (DGII República Dominicana)
 """
 
 import io
+import logging
 import os
 import zipfile
 import traceback
@@ -14,7 +15,12 @@ from flask import (Flask, render_template, request,
 from werkzeug.utils import secure_filename
 
 from ecf_builder import build_ecf
+from column_validator import validate_columns
+from xsd_validator import validate_xml
 from version import __version__
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024   # 16 MB máximo
@@ -75,8 +81,14 @@ def upload():
     if rename_map:
         df = df.rename(columns=rename_map)
 
+    # Validar columnas del Excel
+    col_warnings = validate_columns(list(df.columns))
+    for w in col_warnings:
+        logger.warning(w)
+
     xmls:   list[tuple[str, str]] = []   # (contenido_xml, nombre_archivo)
     errores: list[str]            = []
+    xsd_warnings: list[str]       = []
 
     for idx, row_series in df.iterrows():
         row = row_series.to_dict()
@@ -90,6 +102,16 @@ def upload():
                 base, ext = filename.rsplit('.', 1)
                 filename = f'{base}_fila{fila_num}.{ext}'
             xmls.append((xml_str, filename))
+
+            # Validar contra XSD
+            tipo_raw = row.get('TipoeCF') or ''
+            try:
+                tipo = int(float(str(tipo_raw).strip()))
+            except (ValueError, TypeError):
+                tipo = 0
+            xsd_errs = validate_xml(xml_str, tipo)
+            for err in xsd_errs:
+                xsd_warnings.append(f'Fila {fila_num} ({filename}): {err}')
         except Exception as exc:
             errores.append(
                 f'Fila {fila_num}: {exc}\n{traceback.format_exc()}'
@@ -108,6 +130,11 @@ def upload():
             zf.writestr(name, content.encode('utf-8'))
         if errores:
             zf.writestr('errores.txt', '\n\n---\n\n'.join(errores))
+
+        # Incluir advertencias de validación
+        all_warnings = col_warnings + xsd_warnings
+        if all_warnings:
+            zf.writestr('advertencias.txt', '\n'.join(all_warnings))
     zip_buffer.seek(0)
 
     return send_file(
@@ -256,6 +283,52 @@ def _generate_template(path: str):
                  f'Item_{n}_OM_RecargoOtraMoneda',
                  f'Item_{n}_OM_MontoItemOtraMoneda',
                  f'Item_{n}_MontoItem']
+
+    # Subtotales (2 de ejemplo)
+    for n in range(1, 3):
+        cols += [f'Sub_{n}_NumeroSubTotal', f'Sub_{n}_DescripcionSubtotal',
+                 f'Sub_{n}_Orden', f'Sub_{n}_SubMontoGravadoTotal',
+                 f'Sub_{n}_SubMontoGravadoI1', f'Sub_{n}_SubMontoGravadoI2',
+                 f'Sub_{n}_SubMontoGravadoI3', f'Sub_{n}_SubMontoExento',
+                 f'Sub_{n}_SubTotalITBIS', f'Sub_{n}_SubTotalITBIS1',
+                 f'Sub_{n}_SubTotalITBIS2', f'Sub_{n}_SubTotalITBIS3',
+                 f'Sub_{n}_SubMontoImpuestoAdicional',
+                 f'Sub_{n}_SubTotal', f'Sub_{n}_SubMontoNoFacturable',
+                 f'Sub_{n}_SubMontoGravadoTotalOtraMoneda',
+                 f'Sub_{n}_SubMontoGravadoI1OtraMoneda',
+                 f'Sub_{n}_SubMontoGravadoI2OtraMoneda',
+                 f'Sub_{n}_SubMontoGravadoI3OtraMoneda',
+                 f'Sub_{n}_SubMontoExentoOtraMoneda',
+                 f'Sub_{n}_SubTotalITBISOtraMoneda',
+                 f'Sub_{n}_SubTotalITBIS1OtraMoneda',
+                 f'Sub_{n}_SubTotalITBIS2OtraMoneda',
+                 f'Sub_{n}_SubTotalITBIS3OtraMoneda',
+                 f'Sub_{n}_SubMontoImpuestoAdicionalOtraMoneda',
+                 f'Sub_{n}_SubTotalOtraMoneda']
+
+    # DescuentosORecargos (2 de ejemplo)
+    for n in range(1, 3):
+        cols += [f'DR_{n}_NumeroLinea', f'DR_{n}_TipoAjuste',
+                 f'DR_{n}_IndicadorNorma', f'DR_{n}_DescripcionDescuento',
+                 f'DR_{n}_TipoValor', f'DR_{n}_Valor',
+                 f'DR_{n}_MontoDescuento', f'DR_{n}_MontoDescuentoOtraMoneda']
+
+    # Paginacion (2 de ejemplo)
+    for n in range(1, 3):
+        cols += [f'Pag_{n}_PaginaNo', f'Pag_{n}_NoLineaDesde',
+                 f'Pag_{n}_NoLineaHasta',
+                 f'Pag_{n}_SubtotalMontoGravadoPagina',
+                 f'Pag_{n}_SubtotalMontoGravado1Pagina',
+                 f'Pag_{n}_SubtotalMontoGravado2Pagina',
+                 f'Pag_{n}_SubtotalMontoGravado3Pagina',
+                 f'Pag_{n}_SubtotalMontoExentoPagina',
+                 f'Pag_{n}_SubtotalITBIS1Pagina',
+                 f'Pag_{n}_SubtotalITBIS2Pagina',
+                 f'Pag_{n}_SubtotalITBIS3Pagina',
+                 f'Pag_{n}_SubtotalITBISPagina',
+                 f'Pag_{n}_SubtotalImpuestoAdicionalPagina',
+                 f'Pag_{n}_MontoSubtotalPagina',
+                 f'Pag_{n}_SubtotalMontoNoFacturablePagina']
 
     # InformacionReferencia
     cols += ['IR_NCFModificado', 'IR_RNCOtroContribuyente',
