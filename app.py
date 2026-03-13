@@ -16,6 +16,7 @@ from werkzeug.utils import secure_filename
 
 from ecf_builder import build_ecf
 from column_validator import validate_columns
+from dgii_normalizer import normalize_dgii_columns
 from xsd_validator import validate_xml
 from version import __version__
 
@@ -80,6 +81,11 @@ def upload():
             rename_map[col] = 'TipoeCF'
     if rename_map:
         df = df.rename(columns=rename_map)
+
+    # Normalizar columnas DGII (formato corchetes → formato interno)
+    df, dgii_map = normalize_dgii_columns(df)
+    if dgii_map:
+        logger.info('Formato DGII detectado: %d columnas normalizadas', len(dgii_map))
 
     # Validar columnas del Excel
     col_warnings = validate_columns(list(df.columns))

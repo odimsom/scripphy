@@ -62,6 +62,8 @@ DYNAMIC_PATTERNS = [
     re.compile(r"^DR_\d+_"),
     re.compile(r"^Pag_\d+_"),
     re.compile(r"^OM_ImpAd_\d+_"),
+    # Formato DGII corchetes (aceptar tras normalización o directamente)
+    re.compile(r"^.+\[\d+\](\[\d+\])?$"),
 ]
 
 
