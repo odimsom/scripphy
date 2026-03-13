@@ -14,6 +14,7 @@ from flask import (Flask, render_template, request,
 from werkzeug.utils import secure_filename
 
 from ecf_builder import build_ecf
+from version import __version__
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024   # 16 MB máximo
@@ -31,7 +32,7 @@ def _allowed_file(filename: str) -> bool:
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', version=__version__)
 
 
 @app.route('/upload', methods=['POST'])

@@ -145,6 +145,19 @@
             font-size: .86rem;
         }
 
+        .version-badge {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 2px 9px;
+            background: #e8f0e5;
+            border: 1px solid #c9dac5;
+            border-radius: 20px;
+            font-size: .8rem;
+            color: #366140;
+            font-weight: 600;
+            letter-spacing: .4px;
+        }
+
         .list {
             margin: 0;
             padding-left: 18px;
@@ -188,6 +201,7 @@
                 <li>Si una fila falla, se agrega detalle en errores.txt dentro del ZIP.</li>
                 <li>Formato recomendado de fecha: DD-MM-AAAA.</li>
             </ul>
+            <span class="version-badge">v{{ version }}</span>
         </footer>
     </main>
 

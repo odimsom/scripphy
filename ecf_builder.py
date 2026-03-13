@@ -39,13 +39,22 @@ MAX_IMPTABLA    = 2     # ImpuestosAdicionales en TablaImpuesto por item
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Valores que se consideran vacíos (incluyendo placeholders de Excel)
+_EMPTY_VALUES = {
+    'nan', 'none', 'nat',
+    '#e',                       # placeholder DGII / exportadores internos
+    '#n', '#n/a', 'n/a',        # variantes comunes
+    '#value!', '#ref!', '#null!', '#div/0!', '#name?',  # errores de Excel
+}
+
+
 def _is_empty(v) -> bool:
     if v is None:
         return True
     if isinstance(v, float) and math.isnan(v):
         return True
     s = str(v).strip()
-    return s == '' or s.lower() in ('nan', 'none', 'nat')
+    return s == '' or s.lower() in _EMPTY_VALUES
 
 
 def _clean(v) -> str | None:
@@ -771,11 +780,8 @@ def _build_items_47(detalles: ET.Element, row: dict):
 def build_ecf_31(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
+    add(enc, 'Version', '1.0')
 
-    # Version
-    add(enc, 'Version', v(row, 'Version') or '1.0')
-
-    # IdDoc
     id_doc = ET.SubElement(enc, 'IdDoc')
     add(id_doc, 'TipoeCF',                   v(row, 'TipoeCF'))
     add(id_doc, 'eNCF',                      v(row, 'eNCF'))
@@ -794,31 +800,16 @@ def build_ecf_31(row: dict) -> str:
     add(id_doc, 'FechaHasta',                v(row, 'FechaHasta'))
     add(id_doc, 'TotalPaginas',              v(row, 'TotalPaginas'))
 
-    # Emisor
     _build_emisor(enc, row)
-
-    # Comprador
     _build_comprador_full(enc, row)
-
-    # InformacionesAdicionales
     _build_informaciones_adicionales_std_2(enc, row)
-
-    # Transporte
     _build_transporte_std(enc, row)
-
-    # Totales
     _build_totales_full(enc, row, has_imp_adicional=True, has_retencion=False)
-
-    # OtraMoneda
     _build_otra_moneda_full(enc, row)
 
-    # DetallesItems
     detalles = ET.SubElement(root, 'DetallesItems')
     _build_items_full(detalles, row)
-
-    # InformacionReferencia (opcional en 31)
     _build_informacion_referencia(root, row)
-
     add(root, 'FechaHoraFirma', v(row, 'FechaHoraFirma'))
 
     return _pretty(root)
@@ -827,7 +818,7 @@ def build_ecf_31(row: dict) -> str:
 def build_ecf_32(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     # IdDoc - tipo 32 NO tiene FechaVencimientoSecuencia
     id_doc = ET.SubElement(enc, 'IdDoc')
@@ -865,7 +856,7 @@ def build_ecf_32(row: dict) -> str:
 def build_ecf_33(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     id_doc = ET.SubElement(enc, 'IdDoc')
     add(id_doc, 'TipoeCF',                   v(row, 'TipoeCF'))
@@ -903,7 +894,7 @@ def build_ecf_33(row: dict) -> str:
 def build_ecf_34(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     # IdDoc tipo 34 especial: IndicadorNotaCredito, sin TablaFormasPago ni TipoCuenta
     id_doc = ET.SubElement(enc, 'IdDoc')
@@ -939,7 +930,7 @@ def build_ecf_34(row: dict) -> str:
 def build_ecf_41(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     # IdDoc: sin IndicadorEnvioDiferido, sin TipoIngresos, TipoPago opcional
     id_doc = ET.SubElement(enc, 'IdDoc')
@@ -1006,7 +997,7 @@ def build_ecf_41(row: dict) -> str:
 def build_ecf_43(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     id_doc = ET.SubElement(enc, 'IdDoc')
     add(id_doc, 'TipoeCF',                   v(row, 'TipoeCF'))
@@ -1039,7 +1030,7 @@ def build_ecf_43(row: dict) -> str:
 def build_ecf_44(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     id_doc = ET.SubElement(enc, 'IdDoc')
     add(id_doc, 'TipoeCF',                   v(row, 'TipoeCF'))
@@ -1124,7 +1115,7 @@ def build_ecf_44(row: dict) -> str:
 def build_ecf_45(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     id_doc = ET.SubElement(enc, 'IdDoc')
     add(id_doc, 'TipoeCF',                   v(row, 'TipoeCF'))
@@ -1181,7 +1172,7 @@ def build_ecf_45(row: dict) -> str:
 def build_ecf_46(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     id_doc = ET.SubElement(enc, 'IdDoc')
     add(id_doc, 'TipoeCF',                   v(row, 'TipoeCF'))
@@ -1256,7 +1247,7 @@ def build_ecf_46(row: dict) -> str:
 def build_ecf_47(row: dict) -> str:
     root = ET.Element('ECF')
     enc  = ET.SubElement(root, 'Encabezado')
-    add(enc, 'Version', v(row, 'Version') or '1.0')
+    add(enc, 'Version', '1.0')
 
     id_doc = ET.SubElement(enc, 'IdDoc')
     add(id_doc, 'TipoeCF',                   v(row, 'TipoeCF'))
