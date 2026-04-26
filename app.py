@@ -388,5 +388,73 @@ def _generate_template(path: str):
     wb.save(path)
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+@app.route('/api/v1/ecf/generate', methods=['POST'])
+def generate_ecf_api():
+    """
+    Recibe un JSON con los campos del e-CF y devuelve el XML generado.
+    Usado por el backend .NET para generar e-CF en tiempo real al procesar ventas.
+
+    Payload esperado (mínimo para tipo 32 - Factura de Consumo):
+    {
+        "TipoeCF": "32",
+        "eNCF": "E320000000001",
+        "FechaEmision": "19-04-2026",
+        "RNCEmisor": "101234567",
+        "RazonSocialEmisor": "Colmado El Progreso",
+        "DireccionEmisor": "Calle Principal #1",
+        "TelefonoEmisor_1": "8095550001",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "MontoGravadoTotal": "850.00",
+        "MontoExento": "150.00",
+        "TotalITBIS": "153.00",
+        "TotalITBIS1": "153.00",
+        "MontoTotal": "1003.00",
+        "ValorPagar": "1003.00",
+        "Item_1_NumeroLinea": "1",
+        "Item_1_NombreItem": "Arroz 5lb",
+        "Item_1_IndicadorFacturacion": "1",
+        "Item_1_IndicadorBienoServicio": "1",
+        "Item_1_CantidadItem": "2",
+        "Item_1_PrecioUnitarioItem": "75.00",
+        "Item_1_MontoItem": "150.00"
+    }
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'error': 'Se requiere un cuerpo JSON válido.'}), 400
+
+    # Normalizar nombres de columnas (mismo procesamiento que el flujo XLSX)
+    rename_map = {}
+    for key in list(data.keys()):
+        upper = key.upper()
+        if upper == 'ENCF' and key != 'eNCF':
+            rename_map[key] = 'eNCF'
+        elif upper == 'TIPOECF' and key != 'TipoeCF':
+            rename_map[key] = 'TipoeCF'
+    for old_key, new_key in rename_map.items():
+        data[new_key] = data.pop(old_key)
+
+    try:
+        xml_str, filename = build_ecf(data)
+    except Exception as exc:
+        logger.exception('Error generando e-CF desde JSON')
+        return jsonify({'error': str(exc)}), 422
+
+    # Validar contra XSD
+    tipo_raw = data.get('TipoeCF') or ''
+    try:
+        tipo = int(float(str(tipo_raw).strip()))
+    except (ValueError, TypeError):
+        tipo = 0
+
+    xsd_errors = validate_xml(xml_str, tipo)
+    warnings = xsd_errors if xsd_errors else []
+
+    return jsonify({
+        'xml': xml_str,
+        'filename': filename,
+        'warnings': warnings
+    }), 200
+
+
